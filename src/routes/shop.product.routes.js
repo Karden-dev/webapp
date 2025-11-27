@@ -5,7 +5,8 @@ const productController = require('../controllers/shop.product.controller');
 const authMiddleware = require('../middleware/auth.middleware');
 
 // Routes protégées (Token requis)
-router.use(authMiddleware);
+// CORRECTION ICI : On passe la fonction spécifique 'verifyToken' et non l'objet entier
+router.use(authMiddleware.verifyToken);
 
 // Créer un produit (POST /api/products)
 router.post('/', productController.createProduct);
