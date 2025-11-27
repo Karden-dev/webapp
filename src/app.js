@@ -13,6 +13,8 @@ const http = require('http');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/users.routes');
 const shopRoutes = require('./routes/shops.routes');
+// --- AJOUT POUR CORRIGER L'ERREUR 404 ---
+const shopProductRoutes = require('./routes/shop.product.routes'); 
 
 // -- Modules Opérationnels --
 const orderRoutes = require('./routes/orders.routes');
@@ -43,6 +45,8 @@ const orderModel = require('./models/order.model');
 const riderModel = require('./models/rider.model');
 const deliverymenModel = require('./controllers/deliverymen.controller'); // Note: Vérifier si c'est un modèle ou contrôleur, gardé tel quel par sécurité
 const messageModel = require('./models/message.model.js');
+// Initialisation du modèle produit (souvent fait implicitement via le contrôleur, mais bonne pratique)
+const shopProductModel = require('./models/shop.product.model'); 
 
 // -- Modèles Finance --
 const cashModel = require('./models/cash.model');
@@ -56,6 +60,10 @@ const reportModel = require('./models/report.model');
 const dashboardModel = require('./models/dashboard.model');
 const performanceModel = require('./models/performance.model');
 const scheduleModel = require('./models/schedule.model');
+
+// -- Modèles Stock (si présents) --
+const stockMovementModel = require('./models/stock.movement.model');
+const stockRequestModel = require('./models/stock.request.model');
 
 // ============================================================
 // 3. IMPORTS DES SERVICES & SCRIPTS
@@ -98,8 +106,8 @@ app.use('/api/whatsapp/webhook', express.raw({
 }));
 
 // --- Parseurs Globaux ---
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' })); // Augmenté pour les images Base64
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // --- Fichiers Statiques ---
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -148,6 +156,9 @@ async function startServer() {
     messageModel.init(dbPool);
     orderModel.init(dbPool, messageModel); // Dépendance croisée
     
+    // Initialisation modèle produit
+    shopProductModel.init(dbPool);
+    
     // -- Modèles Finance & Stats --
     cashModel.init(dbPool);
     cashStatModel.init(dbPool);
@@ -158,6 +169,10 @@ async function startServer() {
     reportModel.init(dbPool);
     performanceModel.init(dbPool);
     scheduleModel.init(dbPool);
+    
+    // -- Modèles Stock --
+    if (stockMovementModel && stockMovementModel.init) stockMovementModel.init(dbPool);
+    if (stockRequestModel && stockRequestModel.init) stockRequestModel.init(dbPool);
 
     // 3. Initialisation des Services
     console.log('🔄 Initialisation des Services...');
@@ -182,6 +197,10 @@ async function startServer() {
     
     // -- Opérations --
     app.use('/api/shops', shopRoutes);
+    
+    // --- AJOUT POUR CORRIGER L'ERREUR 404 ---
+    app.use('/api/products', shopProductRoutes); 
+    
     app.use('/api/orders', orderRoutes);
     app.use('/api/deliverymen', deliverymenRoutes);
     app.use('/api/rider', riderRoutes);
