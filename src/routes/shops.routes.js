@@ -1,50 +1,21 @@
 // src/routes/shops.routes.js
+
+// ... (Imports existants)
 const express = require('express');
 const router = express.Router();
 const shopModel = require('../models/shop.model');
-
-// --- IMPORTS ---
 const shopController = require('../controllers/shops.controller'); 
 const authMiddleware = require('../middleware/auth.middleware');
 
 // ============================================================
-// NOUVELLES ROUTES (APP MARCHAND & SÉCURITÉ)
+// ROUTES PUBLIQUES (LECTURE & LOGIN)
 // ============================================================
 
 // Login spécifique App Mobile Marchand (Public)
 router.post('/login', shopController.merchantLogin);
 
-// --- CORRECTION DU BUG ICI ---
-// On applique le middleware de sécurité pour toutes les routes suivantes.
-// IL FAUT UTILISER 'authMiddleware.verifyToken' ET NON 'authMiddleware' TOUT SEUL.
-router.use(authMiddleware.verifyToken); 
-
-// Mise à jour du code PIN
-router.put('/:shopId/pin', shopController.updateShopPin);
-
-
-// ============================================================
-// ROUTES EXISTANTES (BACKOFFICE ADMIN)
-// ============================================================
-
-// POST / : Créer une nouvelle boutique
-router.post('/', async (req, res) => {
-    try {
-        const shopData = {
-            name: req.body.name,
-            phone_number: req.body.phone_number,
-            created_by: req.body.created_by,
-            bill_packaging: !!req.body.bill_packaging,
-            bill_storage: !!req.body.bill_storage,
-            packaging_price: req.body.packaging_price || 50.00,
-            storage_price: req.body.storage_price || 100.00
-        };
-        const result = await shopModel.create(shopData);
-        res.status(201).json({ message: 'Boutique créée avec succès.', shopId: result.insertId });
-    } catch (error) {
-        res.status(500).json({ message: 'Erreur lors de la création de la boutique.' });
-    }
-});
+// --- DÉPLACEMENT DES ROUTES DE LECTURE ICI (AVANT LE MIDDLEWARE) ---
+// Cela corrige l'erreur 403 sur debts.html
 
 // GET / : Récupérer les boutiques avec filtres et recherche
 router.get('/', async (req, res) => {
@@ -80,6 +51,36 @@ router.get('/:id', async (req, res) => {
         res.status(200).json(shop);
     } catch (error) {
         res.status(500).json({ message: 'Erreur lors de la récupération de la boutique.' });
+    }
+});
+
+
+// ============================================================
+// ROUTES PROTÉGÉES (ACTIONS D'ÉCRITURE)
+// ============================================================
+
+// On applique le middleware de sécurité pour toutes les routes SUIVANTES uniquement.
+router.use(authMiddleware.verifyToken); 
+
+// Mise à jour du code PIN
+router.put('/:shopId/pin', shopController.updateShopPin);
+
+// POST / : Créer une nouvelle boutique
+router.post('/', async (req, res) => {
+    try {
+        const shopData = {
+            name: req.body.name,
+            phone_number: req.body.phone_number,
+            created_by: req.body.created_by,
+            bill_packaging: !!req.body.bill_packaging,
+            bill_storage: !!req.body.bill_storage,
+            packaging_price: req.body.packaging_price || 50.00,
+            storage_price: req.body.storage_price || 100.00
+        };
+        const result = await shopModel.create(shopData);
+        res.status(201).json({ message: 'Boutique créée avec succès.', shopId: result.insertId });
+    } catch (error) {
+        res.status(500).json({ message: 'Erreur lors de la création de la boutique.' });
     }
 });
 
