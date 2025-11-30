@@ -4,20 +4,53 @@ const userModel = require('../models/user.model');
 const scheduleModel = require('../models/schedule.model');
 const moment = require('moment');
 
-// --- Fonctions de Calcul de Rémunération (omises pour la concision) ---
+// --- Fonctions de Calcul de Rémunération ---
+
 const calculatePiedRemuneration = (stats) => {
     const ca = stats.ca_delivery_fees || 0;
     const expenses = stats.total_expenses || 0;
     const netBalance = ca - expenses;
     const expenseRatio = ca > 0 ? (expenses / ca) : 0;
+
     let rate = 0.45;
     let bonusApplied = false;
+    
+    // NOUVEAU : Variables pour le Malus
+    let penaltyApplied = false;
+    let penaltyAmount = 0;
+
+    // 1. Application du Bonus (Taux majoré si dépenses <= 35%)
     if (ca > 0 && expenseRatio <= 0.35) {
         rate = 0.50;
         bonusApplied = true;
     }
-    const finalPay = netBalance * rate;
-    return { ca, expenses, netBalance, expenseRatio, rate, bonusApplied, totalPay: finalPay > 0 ? finalPay : 0 };
+
+    // 2. Calcul du Salaire Théorique
+    let finalPay = netBalance * rate;
+
+    // 3. Application du Malus (Déduction si dépenses > 40%)
+    if (ca > 0 && expenseRatio > 0.40) {
+        const allowedExpenses = ca * 0.40; // Plafond autorisé (40% du CA)
+        const excess = expenses - allowedExpenses; // Calcul de l'excédent
+        
+        if (excess > 0) {
+            penaltyApplied = true;
+            penaltyAmount = excess;
+            finalPay -= penaltyAmount; // Déduction directe sur le salaire
+        }
+    }
+
+    return { 
+        ca, 
+        expenses, 
+        netBalance, 
+        expenseRatio, 
+        rate, 
+        bonusApplied, 
+        penaltyApplied, // Info pour le front
+        penaltyAmount,  // Info pour le front
+        totalPay: finalPay > 0 ? finalPay : 0 
+    };
 };
 
 const calculateMotoRemuneration = (livreurDetails, stats, objectivesAdmin = null) => {
@@ -275,5 +308,5 @@ module.exports = {
     getDeliverymanSettings,
     updateDeliverymanSettings,
     getDeliverymanPerformanceJournal,
-    updateFcmToken // <-- NOUVELLE FONCTION EXPORTÉE
+    updateFcmToken 
 };
