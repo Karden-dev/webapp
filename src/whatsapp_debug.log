@@ -1,0 +1,37 @@
+2025-12-09T08:24:37.496Z - -----------------------------------------
+2025-12-09T08:24:37.497Z - [FLUX] Appel Webhook reçu.
+2025-12-09T08:24:37.497Z - [SIG VERIFY] Signature vérifiée avec succès !
+2025-12-09T08:24:37.498Z - [FLUX] Événement Wasender reçu et validé.
+2025-12-09T08:24:37.498Z - [FLUX] Horodatage validé. Âge: NaNs.
+2025-12-09T08:24:37.498Z - [FLUX] Événement ignoré (pas de contenu texte). Type de message reçu: call (ex: reactionMessage, audioMessage, etc.)
+2025-12-09T08:24:37.500Z - -----------------------------------------
+2025-12-09T08:24:37.501Z - [FLUX] Appel Webhook reçu.
+2025-12-09T08:24:37.501Z - [SIG VERIFY] Signature vérifiée avec succès !
+2025-12-09T08:24:37.501Z - [FLUX] Événement Wasender reçu et validé.
+2025-12-09T08:24:37.501Z - [FLUX] Message ignoré (ID déjà traité - doublon Wasender): A596DCB552B96EE11051D41C3FB7E57F
+2025-12-09T08:24:38.111Z - -----------------------------------------
+2025-12-09T08:24:38.111Z - [FLUX] Appel Webhook reçu.
+2025-12-09T08:24:38.111Z - [SIG VERIFY] Signature vérifiée avec succès !
+2025-12-09T08:24:38.112Z - [FLUX] Événement Wasender reçu et validé.
+2025-12-09T08:24:38.112Z - [FLUX] Événement non pertinent ignoré (Event: messages.update). Renvoi de 200 OK.
+2025-12-09T08:42:30.617Z - -----------------------------------------
+2025-12-09T08:42:30.619Z - [FLUX] Appel Webhook reçu.
+2025-12-09T08:42:30.620Z - [SIG VERIFY] Signature vérifiée avec succès !
+2025-12-09T08:42:30.620Z - [FLUX] Événement Wasender reçu et validé.
+2025-12-09T08:42:30.620Z - [FLUX] Horodatage validé. Âge: NaNs.
+2025-12-09T08:42:30.621Z - [FLUX] Événement ignoré (pas de contenu texte). Type de message reçu: call (ex: reactionMessage, audioMessage, etc.)
+2025-12-09T08:42:30.623Z - -----------------------------------------
+2025-12-09T08:42:30.623Z - [FLUX] Appel Webhook reçu.
+2025-12-09T08:42:30.623Z - [SIG VERIFY] Signature vérifiée avec succès !
+2025-12-09T08:42:30.624Z - [FLUX] Événement Wasender reçu et validé.
+2025-12-09T08:42:30.624Z - [FLUX] Message ignoré (ID déjà traité - doublon Wasender): A5CA8CCB13C8BB320BBF262F4E287303
+2025-12-09T08:42:31.131Z - -----------------------------------------
+2025-12-09T08:42:31.131Z - [FLUX] Appel Webhook reçu.
+2025-12-09T08:42:31.131Z - [SIG VERIFY] Signature vérifiée avec succès !
+2025-12-09T08:42:31.131Z - [FLUX] Événement Wasender reçu et validé.
+2025-12-09T08:42:31.131Z - [FLUX] Événement non pertinent ignoré (Event: messages.update). Renvoi de 200 OK.
+2025-12-09T09:30:03.737Z - -----------------------------------------
+2025-12-09T09:30:03.779Z - [FLUX] Appel Webhook reçu.
+2025-12-09T09:30:03.787Z - [SIG VERIFY] Signature vérifiée avec succès !
+2025-12-09T09:30:03.787Z - [FLUX] Événement Wasender reçu et validé.
+2025-12-09T09:30:03.787Z - [FLUX] Événement non pertinent ignoré (Event: session.status). Renvoi de 200 OK.
