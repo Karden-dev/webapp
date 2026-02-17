@@ -162,16 +162,25 @@ const findForRemittance = async (filters = {}) => {
 
 /**
  * Marque un versement comme payé.
- * CORRECTION CRITIQUE : Calcule et déduit les dettes en temps réel (au moment du clic)
- * pour éviter les décalages entre l'affichage et le paiement réel.
+ * CORRECTION CRITIQUE : Calcule et déduit les dettes en temps réel.
+ * UPDATE : Accepte 'effectiveDate' pour forcer la date comptable (remontée dans le temps).
  */
-const markAsPaid = async (remittanceId, userId) => {
+const markAsPaid = async (remittanceId, userId, effectiveDate = null) => {
     const connection = await dbConnection.getConnection();
     try {
         await connection.beginTransaction();
 
+        // Définition des dates (Si effectiveDate est fourni par le contrôleur, on l'utilise)
+        const paymentDateStr = effectiveDate 
+            ? moment(effectiveDate).format('YYYY-MM-DD') 
+            : moment().format('YYYY-MM-DD');
+            
+        // Pour les dettes, on utilise la même date pour que le settled_at soit cohérent
+        const settledAtStr = effectiveDate 
+            ? moment(effectiveDate).format('YYYY-MM-DD HH:mm:ss') 
+            : moment().format('YYYY-MM-DD HH:mm:ss');
+
         // 1. Récupérer les informations du versement (ID Boutique et Montant Brut)
-        // 'FOR UPDATE' verrouille la ligne pour éviter qu'un autre processus n'y touche en même temps
         const [remittanceRow] = await connection.execute(
             'SELECT shop_id, amount FROM remittances WHERE id = ? AND status = ? FOR UPDATE',
             [remittanceId, 'pending']
@@ -185,8 +194,6 @@ const markAsPaid = async (remittanceId, userId) => {
         const grossAmount = parseFloat(remittanceRow[0].amount);
 
         // 2. CALCULER LES DETTES EN TEMPS RÉEL
-        // On somme toutes les dettes en attente pour ce marchand à cet instant précis
-        // On verrouille aussi ces lignes dans la table 'debts' pour garantir la cohérence
         const [debtRow] = await connection.execute(
             `SELECT COALESCE(SUM(amount), 0) AS current_total_debts 
              FROM debts 
@@ -199,28 +206,27 @@ const markAsPaid = async (remittanceId, userId) => {
         // 3. Calculer le Montant Net à Payer MAINTENANT
         const netAmountPaid = grossAmount - currentDebts;
 
-        // 4. Mettre à jour le versement avec les valeurs réelles utilisées
-        // On met à jour 'debts_consolidated' ici pour qu'il reflète exactement ce qui a été déduit
+        // 4. Mettre à jour le versement avec les valeurs réelles et la DATE EFFECTIVE
         const [updateResult] = await connection.execute(
             `UPDATE remittances 
              SET status = 'paid', 
-                 payment_date = CURDATE(), 
+                 payment_date = ?, -- Utilisation de la date effective
                  user_id = ?, 
                  net_amount_paid = ?, 
                  debts_consolidated = ? 
              WHERE id = ?`,
-            [userId, netAmountPaid, currentDebts, remittanceId]
+            [paymentDateStr, userId, netAmountPaid, currentDebts, remittanceId]
         );
 
-        // 5. Marquer les dettes comme payées (si dettes il y a)
+        // 5. Marquer les dettes comme payées avec la DATE EFFECTIVE
         if (currentDebts > 0) {
             await connection.execute(
                 `UPDATE debts 
                  SET status = 'paid', 
-                     settled_at = NOW(), 
+                     settled_at = ?, -- Utilisation de la date effective
                      updated_by = ? 
                  WHERE shop_id = ? AND status = 'pending'`,
-                [userId, shopId]
+                [settledAtStr, userId, shopId]
             );
         }
 
@@ -241,7 +247,6 @@ const markAsPaid = async (remittanceId, userId) => {
 const getShopDetails = async (shopId) => {
     const connection = await dbConnection.getConnection();
     try {
-        // Sélectionne net_amount_paid pour l'historique aussi
         const [remittances] = await connection.execute(
             'SELECT id, shop_id, amount, remittance_date, payment_date, payment_operator, status, transaction_id, comment, debts_consolidated, net_amount_paid FROM remittances WHERE shop_id = ? ORDER BY payment_date DESC',
             [shopId]
@@ -250,7 +255,6 @@ const getShopDetails = async (shopId) => {
             'SELECT * FROM debts WHERE shop_id = ? AND status = "pending" ORDER BY created_at DESC',
             [shopId]
         );
-        // Simplification de la requête de solde (cette logique est complexe et peut nécessiter une révision séparée)
         const [ordersPayout] = await connection.execute(
              `SELECT COALESCE(SUM(CASE WHEN status = 'delivered' AND payment_status = 'cash' THEN article_amount - delivery_fee - expedition_fee WHEN status = 'delivered' AND payment_status = 'paid_to_supplier' THEN -delivery_fee - expedition_fee WHEN status = 'failed_delivery' THEN amount_received - delivery_fee - expedition_fee ELSE 0 END), 0) AS orders_payout_amount
               FROM orders
@@ -259,15 +263,12 @@ const getShopDetails = async (shopId) => {
         );
         const ordersPayoutAmount = ordersPayout[0].orders_payout_amount || 0;
         const totalDebt = debts.reduce((sum, debt) => sum + parseFloat(debt.amount), 0);
-        // Le total versé devrait idéalement utiliser net_amount_paid pour les versements payés
         const totalRemitted = remittances.reduce((sum, rem) => {
             const amountConsidered = rem.status === 'paid' ? parseFloat(rem.net_amount_paid || 0) : parseFloat(rem.amount - rem.debts_consolidated);
-            return sum + (amountConsidered > 0 ? amountConsidered : 0); // Ne compter que les versements positifs
+            return sum + (amountConsidered > 0 ? amountConsidered : 0); 
         }, 0);
 
-        // Note: Le calcul du 'currentBalance' peut être complexe et dépendre de la définition exacte.
-        // Celui-ci est une approximation basée sur les infos disponibles.
-        const currentBalance = ordersPayoutAmount - totalDebt; // Le solde avant versement
+        const currentBalance = ordersPayoutAmount - totalDebt; 
         return { remittances, debts, currentBalance };
     } finally {
         connection.release();
@@ -282,7 +283,6 @@ const updateShopPaymentDetails = async (shopId, paymentData) => {
 };
 
 const recordRemittance = async (shopId, amount, paymentOperator, status, transactionId = null, comment = null, userId) => {
-    // Cette fonction semble être pour des enregistrements manuels et ne devrait pas affecter net_amount_paid directement.
     const query = 'INSERT INTO remittances (shop_id, amount, remittance_date, payment_operator, status, transaction_id, comment, user_id) VALUES (?, ?, CURDATE(), ?, ?, ?, ?, ?)';
     const [result] = await dbConnection.execute(query, [shopId, amount, paymentOperator, status, transactionId, comment, userId]);
     return result;
@@ -291,10 +291,9 @@ const recordRemittance = async (shopId, amount, paymentOperator, status, transac
 
 // --- DÉBUT : AJOUTS POUR OUTILS IA MARCHAND ---
 
-// (Helper pour calculer les plages de dates)
 const getDateRange = (period) => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Début du jour
+    today.setHours(0, 0, 0, 0); 
     
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
@@ -308,7 +307,7 @@ const getDateRange = (period) => {
             return { start: yesterday, end: today };
         case 'this_week':
             const firstDayOfWeek = new Date(today);
-            firstDayOfWeek.setDate(today.getDate() - today.getDay()); // Dimanche (si 0) ou Lundi (si 1)
+            firstDayOfWeek.setDate(today.getDate() - today.getDay()); 
             return { start: firstDayOfWeek, end: tomorrow };
         case 'last_week':
             const firstDayOfLastWeek = new Date(today);
@@ -320,13 +319,10 @@ const getDateRange = (period) => {
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
             return { start: firstDayOfMonth, end: tomorrow };
         default:
-            return { start: today, end: tomorrow }; // Par défaut : aujourd'hui
+            return { start: today, end: tomorrow }; 
     }
 };
 
-/**
- * (AJOUT OUTIL IA) Récupère l'historique des versements pour une boutique.
- */
 const getHistoryForShop = async (shopId, period) => {
     const connection = await dbConnection.getConnection();
     try {
@@ -356,11 +352,11 @@ const getHistoryForShop = async (shopId, period) => {
 
 module.exports = {
     init,
-    findForRemittance, // Modifié et corrigé (gestion erreur 500)
-    syncDailyBalancesToRemittances, // Modifié pour gérer les soldes négatifs
-    getShopDetails, // Inchangé
-    updateShopPaymentDetails, // Inchangé
-    recordRemittance, // Inchangé
-    markAsPaid, // Modifié
-    getHistoryForShop // <-- AJOUTÉ
+    findForRemittance, 
+    syncDailyBalancesToRemittances, 
+    getShopDetails, 
+    updateShopPaymentDetails, 
+    recordRemittance, 
+    markAsPaid, 
+    getHistoryForShop 
 };
