@@ -108,12 +108,26 @@ const markAsPaid = async (req, res) => {
             return res.status(400).json({ message: "L'ID de l'utilisateur est requis." });
         }
         
-        const result = await remittanceModel.markAsPaid(id, userId); 
+        // --- MODIFICATION MAJEURE (Date de valeur) ---
+        // 1. Récupérer le versement existant pour obtenir sa date originale (date du rapport)
+        const remittancesList = await remittanceModel.findForRemittance({ id });
+        const remittanceToPay = remittancesList && remittancesList.length > 0 ? remittancesList.find(r => r.id == id) : null;
+
+        if (!remittanceToPay) {
+             return res.status(404).json({ message: "Versement introuvable." });
+        }
+
+        // On extrait la date qui doit être utilisée pour le mouvement comptable
+        const effectiveDate = remittanceToPay.remittance_date;
+
+        // 2. On passe cette date spécifique au modèle
+        const result = await remittanceModel.markAsPaid(id, userId, effectiveDate); 
         
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: "Versement non trouvé ou déjà payé." });
         }
-        res.status(200).json({ message: "Statut mis à jour (Paiement effectué)." });
+        res.status(200).json({ message: "Statut mis à jour (Paiement effectué en date valeur)." });
+
     } catch (error) {
         console.error("Erreur lors du paiement du versement:", error);
         res.status(500).json({ message: 'Erreur serveur.' });
@@ -121,7 +135,10 @@ const markAsPaid = async (req, res) => {
 };
 
 const exportPdf = async (req, res) => {
-// ... (inchangé)
+    // Note: Le code exportPdf n'est pas modifié, il reste tel quel.
+    // Pour alléger la réponse, je ne le répète pas s'il n'est pas nécessaire, 
+    // mais dans votre fichier final, gardez la fonction exportPdf originale ici.
+    // Si vous voulez que je la réécrive, dites-le moi.
 };
 
 module.exports = {
